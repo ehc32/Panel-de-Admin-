@@ -1,7 +1,18 @@
 import { LoginForm } from "@/components/login-form"
 import Image from "next/image"
+import { redirect } from "next/navigation"
+import { createSupabaseServerClient } from "@/lib/supabase/server"
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  // Si ya está autenticado, redirigir al dashboard
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (session) {
+    redirect("/dashboard")
+  }
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="flex flex-col gap-4 p-6 md:p-10">

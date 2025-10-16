@@ -3,6 +3,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { LayoutDashboard, BarChart3, User, ChevronRight, LogOut } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 import {
   Sidebar,
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { ModeToggle } from "@/components/mode-toggle"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 
 // 🧭 Navegación principal
@@ -69,55 +71,61 @@ export function AppSidebar() {
   useEffect(() => {
     const load = async () => {
       const supabase = createSupabaseBrowserClient()
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       setUserEmail(session?.user?.email ?? null)
     }
     load()
   }, [])
 
-  const initials = (userEmail?.split("@")[0].slice(0, 2).toUpperCase() ?? "US")
+  const initials = userEmail?.split("@")[0].slice(0, 2).toUpperCase() ?? "US"
   const displayName = userEmail ? userEmail.split("@")[0].replace(/\./g, " ") : "Administrador"
 
   return (
-    <Sidebar
-      collapsible="icon"
-      className="border-none bg-white shadow-sm rounded-r-xl"
-    >
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
       {/* HEADER */}
-      <SidebarHeader className="px-4 py-6 bg-transparent">
+      <SidebarHeader className="px-3 py-4 bg-transparent">
         <div className="flex items-center gap-3">
           {/* Logo */}
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden shadow-sm">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg overflow-hidden shadow-sm flex-shrink-0">
             <img
-              src="/Icono.jpg" // ⚠️ coloca aquí el nombre real de tu logo (por ejemplo: /logo.png)
+              src="/Icono.jpg"
               alt="Logo"
               className="h-full w-full object-cover"
             />
           </div>
 
           {!isCollapsed && (
-            <div className="flex flex-col">
-              <span className="text-lg font-bold leading-tight tracking-tight text-foreground">
-                Admin Panel
-              </span>
-              <span className="text-xs font-medium text-muted-foreground">
-                Gestión de clientes
-              </span>
-            </div>
+            <>
+              <div className="flex flex-col flex-1 min-w-0">
+                <span className="text-base font-bold leading-tight tracking-tight text-sidebar-foreground truncate">
+                  Admin Panel
+                </span>
+                <span className="text-xs font-medium text-sidebar-foreground/60 truncate">Gestión de clientes</span>
+              </div>
+
+              {/* ModeToggle button in the header */}
+              <div className="flex-shrink-0">
+                <ModeToggle />
+              </div>
+            </>
           )}
         </div>
       </SidebarHeader>
 
-      <SidebarSeparator className="my-2 bg-transparent" />
+      <SidebarSeparator className="my-1 bg-sidebar-border/50" />
 
       {/* CONTENIDO PRINCIPAL */}
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="px-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
-            Navegación Principal
-          </SidebarGroupLabel>
-          <SidebarGroupContent className="px-2">
-            <SidebarMenu className="gap-1">
+          {!isCollapsed && (
+            <SidebarGroupLabel className="px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60">
+              Navegación
+            </SidebarGroupLabel>
+          )}
+          <SidebarGroupContent className={cn("px-2", isCollapsed && "px-1")}>
+            <SidebarMenu className="gap-0.5">
               {mainNavItems.map((item) => {
                 const isActive = pathname === item.url
                 return (
@@ -126,24 +134,33 @@ export function AppSidebar() {
                       asChild
                       isActive={isActive}
                       tooltip={item.title}
-                      className="group relative h-11 transition-all duration-200 hover:bg-accent/50 rounded-lg"
+                      className={cn(
+                        "group relative h-10 transition-all duration-200 rounded-md",
+                        isActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                          : "hover:bg-sidebar-accent/50 text-sidebar-foreground/70 hover:text-sidebar-foreground",
+                        isCollapsed && "justify-center px-0"
+                      )}
                     >
-                      <Link href={item.url} className="flex items-center gap-3">
-                        {isActive && (
-                          <div className="absolute left-0 h-8 w-1 rounded-r-full bg-primary shadow-sm shadow-primary/50" />
-                        )}
-                        <item.icon
-                          className={`h-5 w-5 transition-colors ${isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}
-                        />
-                        <span
-                          className={`font-medium transition-colors ${isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"}`}
-                        >
-                          {item.title}
-                        </span>
-                        {item.badge && !isCollapsed && (
-                          <Badge variant="secondary" className="ml-auto h-5 px-2 text-xs font-semibold shadow-sm">
-                            {item.badge}
-                          </Badge>
+                      <Link href={item.url} className={cn(
+                        "flex items-center w-full",
+                        isCollapsed ? "justify-center" : "gap-3"
+                      )}>
+                        <item.icon className={cn(
+                          "flex-shrink-0",
+                          isCollapsed ? "h-5 w-5" : "h-4 w-4"
+                        )} />
+                        {!isCollapsed && (
+                          <>
+                            <span className="flex-1 truncate text-sm">
+                              {item.title}
+                            </span>
+                            {item.badge && (
+                              <Badge variant="secondary" className="ml-auto h-5 px-2 text-xs font-semibold">
+                                {item.badge}
+                              </Badge>
+                            )}
+                          </>
                         )}
                       </Link>
                     </SidebarMenuButton>
@@ -156,28 +173,37 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* FOOTER / USUARIO */}
-      <SidebarFooter className="mt-auto p-2 border-t border-muted/20">
+      <SidebarFooter className={cn(
+        "mt-auto border-t border-sidebar-border/50",
+        isCollapsed ? "p-1" : "p-2"
+      )}>
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
-                  className="group h-14 transition-all duration-200 hover:bg-accent/50 data-[state=open]:bg-accent rounded-lg"
+                  className={cn(
+                    "group h-12 transition-all duration-200 hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent rounded-md",
+                    isCollapsed && "justify-center px-0"
+                  )}
                 >
-                  <Avatar className="h-9 w-9 rounded-xl border-2 border-primary/10 shadow-sm">
+                  <Avatar className={cn(
+                    "rounded-lg border border-sidebar-border/50",
+                    isCollapsed ? "h-8 w-8" : "h-8 w-8"
+                  )}>
                     <AvatarImage src="/diverse-user-avatars.png" alt="Usuario" />
-                    <AvatarFallback className="rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 text-sm font-semibold text-primary">
+                    <AvatarFallback className="rounded-lg bg-sidebar-accent text-xs font-semibold text-sidebar-foreground">
                       {initials}
                     </AvatarFallback>
                   </Avatar>
                   {!isCollapsed && (
                     <>
-                      <div className="grid flex-1 text-left text-sm leading-tight">
-                        <span className="truncate font-semibold text-foreground">{displayName}</span>
-                        <span className="truncate text-xs text-muted-foreground">{userEmail ?? ""}</span>
+                      <div className="grid flex-1 text-left text-sm leading-tight min-w-0">
+                        <span className="truncate font-semibold text-sidebar-foreground text-sm">{displayName}</span>
+                        <span className="truncate text-xs text-sidebar-foreground/60">{userEmail ?? ""}</span>
                       </div>
-                      <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+                      <ChevronRight className="ml-auto h-4 w-4 text-sidebar-foreground/60 transition-transform group-data-[state=open]:rotate-90 flex-shrink-0" />
                     </>
                   )}
                 </SidebarMenuButton>

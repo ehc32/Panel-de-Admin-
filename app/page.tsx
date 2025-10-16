@@ -7,9 +7,11 @@ export default async function Home() {
     data: { session },
   } = await supabase.auth.getSession();
 
-  const adminEmail = process.env.ADMIN_EMAIL;
-  const isAdmin = session?.user?.email && adminEmail && session.user.email === adminEmail;
-
-  if (isAdmin) redirect("/dashboard");
+  // Si hay sesión activa, redirigir al dashboard
+  if (session) {
+    redirect("/dashboard");
+  }
+  
+  // Si no hay sesión, redirigir al login
   redirect("/login");
 }
