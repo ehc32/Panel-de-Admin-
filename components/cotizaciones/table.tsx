@@ -16,7 +16,18 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown, FileSpreadsheet, FileText, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react"
+import {
+  ArrowUpDown,
+  ChevronDown,
+  Eye,
+  FileSpreadsheet,
+  FileText,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -55,6 +66,8 @@ function formatCurrency(n: number) {
 export function CotizacionesTable() {
   const { data, isLoading, mutate } = useSWR("cotizaciones", fetcher)
   const [open, setOpen] = React.useState(false)
+  const [viewOpen, setViewOpen] = React.useState(false)
+  const [viewing, setViewing] = React.useState<Cotizacion | null>(null)
   const [editing, setEditing] = React.useState<Cotizacion | null>(null)
   const [form, setForm] = React.useState<Partial<Cotizacion>>({})
 
@@ -69,19 +82,32 @@ export function CotizacionesTable() {
     setOpen(true)
   }
 
+  const onView = React.useCallback((row: Cotizacion) => {
+    setViewing(row)
+    setViewOpen(true)
+  }, [])
+
   const onEdit = React.useCallback((row: Cotizacion) => {
     setEditing(row)
     setForm(row)
     setOpen(true)
   }, [])
 
-  const onDelete = React.useCallback(async (row: Cotizacion) => {
-    if (!confirm("¿Eliminar cotización?")) return
-    const supabase = createSupabaseBrowserClient()
-    const { error } = await supabase.from("cotizaciones").delete().eq("id", row.id)
-    if (error) return toast.error(error.message)
-    toast.success("Eliminado")
+  const onDelete = React.useCallback(
+    async (row: Cotizacion) => {
+      if (!confirm("¿Eliminar cotización?")) return
+      const supabase = createSupabaseBrowserClient()
+      const { error } = await supabase.from("cotizaciones").delete().eq("id", row.id)
+      if (error) return toast.error(error.message)
+      toast.success("Eliminado")
+      mutate()
+    },
+    [mutate],
+  )
+
+  const onRefresh = React.useCallback(() => {
     mutate()
+    toast.success("Datos actualizados")
   }, [mutate])
 
   const onSubmit = async () => {
@@ -90,7 +116,6 @@ export function CotizacionesTable() {
       nombre: form.nombre || "",
       telefono: form.telefono || "",
       correo: form.correo || "",
-      fecha: form.fecha || "",
       area_total: Number(form.area_total) || 0,
       subtotal_sin_iva: Number(form.subtotal_sin_iva) || 0,
       iva_amount: Number(form.iva_amount) || 0,
@@ -134,24 +159,12 @@ export function CotizacionesTable() {
 
     const doc = new jsPDF({ orientation: "l" })
     const head = [
-      [
-        "Nombre",
-        "Teléfono",
-        "Correo",
-        "Fecha",
-        "Área (m²)",
-        "Subtotal",
-        "IVA",
-        "Total",
-        "Costo/m²",
-        "Costo Construcción",
-      ],
+      ["Nombre", "Teléfono", "Correo", "Área (m²)", "Subtotal", "IVA", "Total", "Costo/m²", "Costo Construcción"],
     ]
     const body = rowsToExport.map((r) => [
       r.nombre,
       r.telefono,
       r.correo,
-      r.fecha,
       r.area_total,
       formatCurrency(r.subtotal_sin_iva),
       formatCurrency(r.iva_amount),
@@ -221,22 +234,6 @@ export function CotizacionesTable() {
           )
         },
         cell: ({ row }) => <div className="lowercase">{row.getValue("correo")}</div>,
-      },
-      {
-        accessorKey: "fecha",
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="h-8 px-2"
-            >
-              Fecha
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          )
-        },
-        cell: ({ row }) => <div>{row.getValue("fecha")}</div>,
       },
       {
         accessorKey: "area_total",
@@ -335,6 +332,10 @@ export function CotizacionesTable() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => onView(cotizacion)} className="gap-2">
+                  <Eye className="h-4 w-4" />
+                  Ver detalles
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigator.clipboard.writeText(cotizacion.correo)}>
                   Copiar correo
                 </DropdownMenuItem>
@@ -356,7 +357,7 @@ export function CotizacionesTable() {
         },
       },
     ],
-    [onEdit, onDelete],
+    [onView, onEdit, onDelete],
   )
 
   const table = useReactTable({
@@ -405,6 +406,16 @@ export function CotizacionesTable() {
           <div className="flex gap-2">
             <Button
               variant="outline"
+              onClick={onRefresh}
+              size="sm"
+              className="gap-2 bg-transparent"
+              disabled={isLoading}
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+              Recargar
+            </Button>
+            <Button
+              variant="outline"
               onClick={exportExcel}
               size="sm"
               className="gap-2 bg-transparent"
@@ -431,7 +442,7 @@ export function CotizacionesTable() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <Input
           placeholder="Buscar por nombre, correo o teléfono..."
           value={(table.getColumn("nombre")?.getFilterValue() as string) ?? ""}
@@ -545,7 +556,84 @@ export function CotizacionesTable() {
         </div>
       </div>
 
-      {/* Dialog for creating or editing cotizaciones */}
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg">Detalles de la cotización</DialogTitle>
+          </DialogHeader>
+          {viewing && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Nombre del cliente</Label>
+                  <p className="text-sm font-medium">{viewing.nombre}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Teléfono</Label>
+                  <p className="text-sm font-medium">{viewing.telefono}</p>
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <Label className="text-xs text-muted-foreground">Correo electrónico</Label>
+                  <p className="text-sm font-medium">{viewing.correo}</p>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold mb-3">Información del proyecto</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Área total</Label>
+                    <p className="text-sm font-medium">{viewing.area_total?.toFixed(2)} m²</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Costo por m²</Label>
+                    <p className="text-sm font-medium">{formatCurrency(viewing.costo_por_m2)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Costo de construcción</Label>
+                    <p className="text-sm font-medium">{formatCurrency(viewing.costo_construccion)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold mb-3">Resumen financiero</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-xs text-muted-foreground">Subtotal sin IVA</Label>
+                    <p className="text-sm font-medium">{formatCurrency(viewing.subtotal_sin_iva)}</p>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <Label className="text-xs text-muted-foreground">IVA</Label>
+                    <p className="text-sm font-medium">{formatCurrency(viewing.iva_amount)}</p>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t">
+                    <Label className="text-sm font-semibold">Total general</Label>
+                    <p className="text-base font-bold">{formatCurrency(viewing.total_general)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setViewOpen(false)}>
+                  Cerrar
+                </Button>
+                <Button
+                  onClick={() => {
+                    setViewOpen(false)
+                    onEdit(viewing)
+                  }}
+                  className="gap-2"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Editar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -570,7 +658,7 @@ export function CotizacionesTable() {
                 placeholder="Número de teléfono"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <Label htmlFor="correo">Correo</Label>
               <Input
                 id="correo"
@@ -578,15 +666,6 @@ export function CotizacionesTable() {
                 value={form.correo || ""}
                 onChange={(e) => setForm({ ...form, correo: e.target.value })}
                 placeholder="correo@ejemplo.com"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="fecha">Fecha</Label>
-              <Input
-                id="fecha"
-                type="date"
-                value={form.fecha || ""}
-                onChange={(e) => setForm({ ...form, fecha: e.target.value })}
               />
             </div>
             <div className="space-y-2">
