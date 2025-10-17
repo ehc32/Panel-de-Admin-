@@ -23,6 +23,18 @@ export const metadata: Metadata = {
     shortcut: "/Icono.jpg",
     apple: "/Icono.jpg",
   },
+  manifest: "/manifest.json",
+  themeColor: "#000000",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Admin Panel",
+  },
 };
 
 export default function RootLayout({
