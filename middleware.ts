@@ -15,7 +15,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
             request,
           })
@@ -27,27 +27,50 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Verificar la sesión del usuario
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  try {
+    // Agregar timeout de 3 segundos para evitar bloqueos
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Auth timeout')), 3000)
+    )
 
-  const isAuthPage = request.nextUrl.pathname.startsWith('/login')
-  const isDashboardPage = request.nextUrl.pathname.startsWith('/dashboard') || 
-                          request.nextUrl.pathname.startsWith('/estadisticas') ||
-                          request.nextUrl.pathname.startsWith('/perfil')
+    // Verificar la sesión del usuario con timeout
+    const { data: { session } } = await Promise.race([
+      supabase.auth.getSession(),
+      timeoutPromise
+    ]) as any
 
-  // Si está en una página de auth y tiene sesión, redirigir al dashboard
-  if (isAuthPage && session) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    const isAuthPage = request.nextUrl.pathname.startsWith('/login')
+    const isDashboardPage = request.nextUrl.pathname.startsWith('/dashboard') || 
+                            request.nextUrl.pathname.startsWith('/estadisticas') ||
+                            request.nextUrl.pathname.startsWith('/perfil')
+
+    // Si está en una página de auth y tiene sesión, redirigir al dashboard
+    if (isAuthPage && session) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    // Si está en una página protegida y NO tiene sesión, redirigir al login
+    if (isDashboardPage && !session) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+
+    return supabaseResponse
+
+  } catch (error) {
+    // En caso de error o timeout, permitir que la solicitud continúe
+    console.error('Middleware error:', error)
+    
+    // Si hay timeout en rutas protegidas, redirigir al login por seguridad
+    const isDashboardPage = request.nextUrl.pathname.startsWith('/dashboard') || 
+                            request.nextUrl.pathname.startsWith('/estadisticas') ||
+                            request.nextUrl.pathname.startsWith('/perfil')
+    
+    if (isDashboardPage) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+    
+    return supabaseResponse
   }
-
-  // Si está en una página protegida y NO tiene sesión, redirigir al login
-  if (isDashboardPage && !session) {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
-
-  return supabaseResponse
 }
 
 export const config = {
